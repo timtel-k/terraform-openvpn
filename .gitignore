@@ -1,0 +1,11 @@
+.terraform
+terraform.tfstate
+*.tfstate*
+terraform.tfvars
+*.tfvars
+
+*.pem
+*.ovpn
+*.gz
+ca/
+files/vpn.yaml
