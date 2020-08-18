@@ -1,6 +1,6 @@
 provider "aws" {
-  region                  = var.region
-  shared_credentials_file = "/home/tt/.aws/credentials"
+  region = var.region
+  shared_credentials_file = "~/.aws/credentials"
 }
 
 resource "aws_security_group" "openvpn" {
@@ -52,6 +52,7 @@ resource "aws_instance" "openvpn" {
   vpc_security_group_ids      = ["${aws_security_group.openvpn.id}"]
   key_name                    = var.ssh_key_name
   subnet_id                   = var.subnet_id
+  user_data                   = data.template_cloudinit_config.config.rendered
 
   tags = {
     Name = var.name
@@ -64,4 +65,17 @@ resource "aws_route53_record" "openvpn" {
   type    = "A"
   ttl     = "300"
   records = ["${aws_instance.openvpn.public_ip}"]
+}
+
+data "template_cloudinit_config" "config" {
+  gzip          = false
+  base64_encode = false
+  part {
+    content_type = "text/x-shellscript"
+    content      = <<-EOF
+    #!/bin/bash
+    adduser --quiet --disabled-password --shell /sbin/nologin --home /home/"${var.vpn_admin_login}" --gecos "User" "${var.vpn_admin_login}"
+    echo "${var.vpn_admin_login}:${var.vpn_admin_password}" | chpasswd
+    EOF
+  }
 }

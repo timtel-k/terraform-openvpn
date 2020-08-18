@@ -4,6 +4,16 @@ variable "host_name" {}
 variable "host_route_53_zone_id" {}
 variable "region" {}
 
+variable "vpn_admin_login" {
+  type        = string
+  default     = "openvpn"
+}
+
+variable "vpn_admin_password" {
+  type        = string
+  default     = "openvpn"
+}
+
 variable "name" {
   description = "Name to be used on all resources as prefix"
   type        = string
