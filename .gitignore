@@ -1,7 +1,7 @@
 .terraform
 terraform.tfstate
 *.tfstate*
-terraform.tfvars
+#terraform.tfvars
 #*.tfvars
 
 *.pem
