@@ -1,0 +1,8 @@
+---
+- name: Example Playbook
+  hosts: all
+  vars:
+    openldap_org: aurismonarchsw
+  become: yes
+  roles:
+     - openldap

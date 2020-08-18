@@ -1,0 +1,150 @@
+---
+- name: Prepare slapd installation answers
+  debconf:
+    name: slapd
+    question: "{{ item.question }}"
+    value: "{{ item.value }}"
+    vtype: "{{ item.vtype }}"
+  with_items:
+    - question: slapd/backend
+      value: HDB
+      vtype: string
+    - question: slapd/move_old_database
+      value: 'true'
+      vtype: boolean
+    - question: slapd/dump_database_destdir
+      value: /var/backups/slapd-VERSION
+      vtype: string
+    - question: slapd/allow_ldap_v2
+      value: 'false'
+      vtype: boolean
+    - question: slapd/purge_database
+      value: 'false'
+      vtype: boolean
+    - question: slapd/domain
+      value: "{{ domain_name }}"
+      vtype: string
+    - question: shared/organization
+      value: "{{ openldap_org }}"
+      vtype: string
+    - question: slapd/password1
+      value: "{{ openldap_admin_password }}"
+      vtype: password
+    - question: slapd/password2
+      value: "{{ openldap_admin_password }}"
+      vtype: password
+    - question: slapd/internal/generated_adminpw
+      value: "{{ openldap_admin_password }}"
+      vtype: password
+    - question: slapd/internal/adminpw
+      value: "{{ openldap_admin_password }}"
+      vtype: password
+
+- name: Installing packages
+  apt:
+    name:
+      - slapd
+      - ldap-utils
+      # These are needed to be able to install python-ldap
+      - build-essential
+      - python3-dev
+      - python3-pip
+      - libldap2-dev
+      - libsasl2-dev
+      - lcov
+      - valgrind
+    state: present
+
+- name: Make sure setuptools and wheel pip modules are present (needed to build python-ldap)
+  pip:
+    name:
+      - setuptools
+      - wheel
+    state: present
+
+- name: Make sure python-ldap pip module is present
+  pip:
+    name:
+      - python-ldap
+    state: present
+
+# - name: attempt to debug
+#   command: /bin/cat /var/log/slapd.log
+#   register: details
+
+# - debug:
+#     msg: "{{ details.stdout_lines | quote }}"
+
+- name: Check to see if we have loaded password module for openldap
+  command: ldapsearch -H ldapi:// -Y EXTERNAL -b "cn=module{0},cn=config" -LLL -Q olcModuleLoad={1}pw-sha2
+  register: pw_sha2
+  changed_when: pw_sha2.stdout == ""
+
+- name: Copy ldif for pw module if needed
+  copy:
+    src: pw.ldif
+    dest: /tmp/pw.ldif
+  when: pw_sha2.stdout == ""
+
+- name: Load password module for openldap if we haven't yet
+  command: ldapmodify -Q -Y EXTERNAL -H ldapi:// -f /tmp/pw.ldif
+  when: pw_sha2.stdout == ""
+
+# - name: Calculate admin password hash
+#   shell: |
+#     # set -o pipefail;
+#     echo -n '{{ openldap_admin_password }}' | openssl dgst -sha512 -binary | openssl enc -base64
+#   register: admin_hash
+#   changed_when: admin_hash.stdout != ""
+
+# - name: Calculate admin password hash
+#   shell: |
+#     echo -n '{{ openldap_admin_password }}' | openssl dgst -sha512 -binary | openssl enc -base64
+#   register: admin_hash
+#   changed_when: admin_hash.stdout != ""
+
+- name: Set admin password again to store it with new password hash scheme
+  ldap_attr:
+    dn: "cn=admin,dc={{ openldap_org }},dc={{ openldap_tld }}"
+    name: "{{ item.key }}"
+    values: "{{ item.value }}"
+    state: exact
+    bind_dn: "cn=admin,dc={{ openldap_org }},dc={{ openldap_tld }}"
+    bind_pw: "{{ openldap_admin_password }}"
+  with_dict:
+    userPassword: "{{ openldap_admin_password_hash }}"
+
+- name: Make sure we have a parent entry for users
+  ldap_entry:
+    dn: "ou={{ item }},dc={{ openldap_org }},dc={{ openldap_tld }}"
+    objectClass: organizationalUnit
+    bind_dn: "cn=admin,dc={{ openldap_org }},dc={{ openldap_tld }}"
+    bind_pw: "{{ openldap_admin_password }}"
+  with_items: "{{ openldap_ous }}"
+
+- name: Delete users to regenerate
+  ldap_entry:
+    dn: "uid={{ item.login }},ou=People,dc={{ openldap_org }},dc={{ openldap_tld }}"
+    objectClass:
+      - inetOrgPerson
+    state: absent
+    bind_dn: "cn=admin,dc={{ openldap_org }},dc={{ openldap_tld }}"
+    bind_pw: "{{ openldap_admin_password }}"
+  with_items: "{{ openldap_users_todelete }}"
+  # with_items: "{{ openldap_users + openldap_users_todelete }}"
+
+- name: Create users
+  ldap_entry:
+    dn: "uid={{ item.login }},ou=People,dc={{ openldap_org }},dc={{ openldap_tld }}"
+    objectClass:
+      - inetOrgPerson
+    state: present
+    bind_dn: "cn=admin,dc={{ openldap_org }},dc={{ openldap_tld }}"
+    bind_pw: "{{ openldap_admin_password }}"
+    attributes:
+      userPassword: "{{ item.passwordHash }}"
+      sn: "{{ item.lastName }}"
+      givenName: "{{ item.firstName }}"
+      cn: "{{ item.firstName }} {{ item.lastName }}"
+      displayName: "{{ item.firstName }} {{ item.lastName }}"
+  with_items: "{{ openldap_users }}"

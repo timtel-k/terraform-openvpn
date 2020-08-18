@@ -1,0 +1,42 @@
+---
+openldap_org: aurismonarchsw
+openldap_tld: com
+openldap_base: "dc={{ openldap_org }},dc={{ openldap_tld }}"
+domain_name: "{{ openldap_org }}.{{ openldap_tld }}"
+
+openldap_ous:
+  - People
+  - Groups
+
+openldap_admin_password: "9999"
+openldap_admin_password_hash: "{SHA512}thJlxqVh6QR273i+PSzqdoMGr6VaLlEMWRAI+Nw+b4qVIGh+X9OAXi2mfPXFiqFgP5YOAnsNUwf9f5i2c90XLw=="
+# openldap_admin_password: super_secure_password
+
+# openldap_users should be an array of user objects with 3 properties: firstName, lastName and passwordHash
+#
+# At this point the role only supports SHA512 encryption and the passwordhash can be obtained using bash:
+#  echo -n 'your_password' | openssl dgst -sha512 -binary | openssl enc -base64
+#
+#  for instance, for a username john.doe with password 'my_password' you would need
+#
+#  - firstName: John
+#    lastName: Doe
+#    passwordHash: "{SHA512}3ajDRohg3LJOIoq47kQgjUPrL1/So6U4uvvTnbT/EUyYKaZL0aRxDgwCH4pBNLai+LF+zMh//nnYRZ4t8pT7AQ=="
+#
+openldap_users:
+  - firstName: Dev1f
+    lastName: Dev1l
+    login: dev1
+    passwordHash: "{SHA512}3ajDRohg3LJOIoq47kQgjUPrL1/So6U4uvvTnbT/EUyYKaZL0aRxDgwCH4pBNLai+LF+zMh//nnYRZ4t8pT7AQ=="
+  - firstName: Devf
+    lastName: Devl
+    login: dev
+    passwordHash: "{SHA512}3ajDRohg3LJOIoq47kQgjUPrL1/So6U4uvvTnbT/EUyYKaZL0aRxDgwCH4pBNLai+LF+zMh//nnYRZ4t8pT7AQ=="
+
+# when you need to delete users on a running LDAP instance, you can just add them here and run the role again as
+# every run will wipe out all the directory and start again
+#
+# openldap_users_todelete should be an array of user objects with 2 properties: firstName and lastName
+#
+openldap_users_todelete: 
+  - login: john.doe
